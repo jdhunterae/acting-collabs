@@ -4,28 +4,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Degrees of Separation</title>
+
+    <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
-    <h1>Actor Match</h1>
+    <header class="site-header">
+        <div class="container">
+            <h1>Degrees of Separation: Actor Collab Finder</h1>
+            <p class="tagline">Search two actors and see what they've done together.</p>
+        </div>
+    </header>
 
-    <p>Have two actors ever been in a movie or show together?</p>
+    <main class="container">
+        <section class="card search-card">
+            <form onsubmit="event.preventDefault(); findCollaboration();" id="searchForm" class="search-form">
+                <label class="field" for="actor1">
+                    <span class="label">Actor 1:</span>
+                    <input type="text" name="actor1" id="actor1" placeholder="e.g., Tom Hanks" inputmode="latin-name" />
+                </label>
 
-    <div>
-        <label for="actor1">Actor 1:</label>
-        <input type="text" name="actor1" id="actor1" placeholder="e.g., Tom Hanks" />
-    </div>
+                <label class="field" for="actor2">
+                    <span class="label">Actor 2:</span>
+                    <input type="text" name="actor2" id="actor2" placeholder="e.g., Meg Ryan" inputmode="latin-name" />
+                </label>
 
-    <div>
-        <label for="actor2">Actor 2:</label>
-        <input type="text" name="actor2" id="actor2" placeholder="e.g., Meg Ryan" />
-    </div>
+                <button id="searchButton" class="btn" type="submit">Find shared credits</button>
+            </form>
 
-    <button id="searchButton">Search</button>
+            <p class="hint">Tip: Press [ENTER] to search.</p>
+        </section>
+    </main>
 
-    <div id="result">
-    </div>
+
+    <section id="result" class="card results">
+    </section>
+
+    <footer class="site-footer">
+        <div class="container">
+            <small>This page uses the <a href="https://www.themoviedb.org/settings/api">TMDb API</a> but is not endorsed
+                or certified by
+                <a href="http://themoviedb.org">TMDb</a>.</small>
+        </div>
+    </footer>
 
     <script src="script.js"></script>
 </body>

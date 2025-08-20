@@ -14,6 +14,13 @@ searchBtn.addEventListener('click', findCollaboration);
 // ----- UTILITIES -----
 const now = () => new Date();
 
+// ---- TV overlap configuration ----
+const TV_CHECK = {
+    includeSpecials: false,  // exclude season 0 ("Specials")
+    maxSeasons: 50,          // safety cap; raise/lower as you like
+    seasonOrder: 'desc',     // 'desc' = recent first for snappier UX
+};
+
 function parseDateMaybe(s) {
     // TMDb dates are YYYY-MM-DD; sometimes missing or empty
     if (!s) return null;
@@ -78,6 +85,76 @@ function roleOf(credit) {
     return credit.character || credit.job || null;
 }
 
+async function getTvSeasons(tvId) {
+    const data = await fetchJSON(`${API_BASE_URL}/tv/${tvId}`);
+    let seasons = data.seasons || [];
+    if (!TV_CHECK.includeSpecials) seasons = seasons.filter(s => (s.season_number ?? 0) > 0);
+    seasons.sort((a, b) =>
+        TV_CHECK.seasonOrder === 'desc'
+            ? b.season_number - a.season_number
+            : a.season_number - b.season_number
+    );
+    if (TV_CHECK.maxSeasons) seasons = seasons.slice(0, TV_CHECK.maxSeasons);
+    console.info(`Found ${seasons.length} season(s) of TV #${tvId}`);
+    return seasons.map(s => s.season_number);
+}
+
+async function seasonContainsBoth(tvId, seasonNumber, p1, p2) {
+    try {
+        const agg = await fetchJSON(`${API_BASE_URL}/tv/${tvId}/season/${seasonNumber}/aggregate_credits`);
+        const ids = new Set([
+            ...((agg.cast || []).map(x => x.id)),
+            ...((agg.crew || []).map(x => x.id)),
+        ]);
+        return ids.has(p1) && ids.has(p2);
+    } catch (e) {
+        console.warn(`aggregate_credits unavailable for S${seasonNumber} of TV ${tvId}`, e);
+        return true;
+    }
+}
+
+async function findSharedEpisodeInSeason(tvId, seasonNumber, p1, p2) {
+    const season = await fetchJSON(`${API_BASE_URL}/tv/${tvId}/season/${seasonNumber}`);
+    const episodes = season.episodes || [];
+    for (const ep of episodes) {
+        const cred = await fetchJSON(`${API_BASE_URL}/tv/${tvId}/season/${seasonNumber}/episode/${ep.episode_number}/credits`);
+        const ids = new Set([
+            ...((cred.cast || []).map(p => p.id)),
+            ...((cred.guest_stars || []).map(p => p.id)),
+            ...((cred.crew || []).map(p => p.id)),
+        ]);
+        if (ids.has(p1) && ids.has(p2)) {
+            return {
+                season: seasonNumber,
+                episode: ep.episode_number,
+                air_date: ep.air_date || null,
+                name: ep.name || null,
+            };
+        }
+    }
+    return null;
+}
+
+async function confirmTvOverlap(tvId, p1, p2) {
+    const seasonNumbers = await getTvSeasons(tvId);
+
+    for (const sn of seasonNumbers) {
+        if (!(await seasonContainsBoth(tvId, sn, p1, p2))) continue;
+        const ep = await findSharedEpisodeInSeason(tvId, sn, p1, p2);
+        if (ep) return ep;
+    }
+
+    return null;
+}
+
+function setLoading(isLoading) {
+    searchBtn.disabled = isLoading;
+
+    if (isLoading) {
+        resultDiv.innerHTML = `<div class="loading"><span class="spinner"></span><span>Searching…</span></div>`;
+    }
+}
+
 // Simple per-session cache so repeated searches are snappy
 const cache = new Map();
 async function fetchJSON(url) {
@@ -122,11 +199,11 @@ async function findCollaboration() {
     const actor2Name = actor2Input.value.trim();
 
     if (!actor1Name || !actor2Name) {
-        resultDiv.innerHTML = 'Please enter both actor names.';
+        resultDiv.innerHTML = `<p class="empty">Please enter both actor names.</p>`;
         return;
     }
 
-    resultDiv.innerHTML = 'Searching…';
+    setLoading(true);
 
     try {
         // 1) Find IDs
@@ -136,7 +213,7 @@ async function findCollaboration() {
         ]);
 
         if (!actor1Id || !actor2Id) {
-            resultDiv.innerHTML = 'Could not find one or both actors. Please check the spelling.';
+            resultDiv.innerHTML = '<p class="empty">Could not find one or both actors. Please check the spelling.</p>';
             return;
         }
 
@@ -150,13 +227,14 @@ async function findCollaboration() {
 
         // 3) Intersect credits by ID (movie+tv entries are unique by `id`)
         const map1 = new Map(a1Credits.map(c => [c.id, c]));
-        const shared = [];
+        const prelim = [];
         for (const c2 of a2Credits) {
-            if (!map1.has(c2.id)) continue;
-
             const c1 = map1.get(c2.id);
+
+            if (!c1) continue;
+
             const releaseDate = releaseDateOf(c1) || releaseDateOf(c2);
-            shared.push({
+            prelim.push({
                 id: c1.id,
                 media_type: c1.media_type || c2.media_type, // "movie" | "tv"
                 title: titleOf(c1) || titleOf(c2),
@@ -170,8 +248,30 @@ async function findCollaboration() {
             });
         }
 
-        // 4) Deduplicate by id just in case and sort by date desc
-        const uniq = Array.from(new Map(shared.map(x => [x.id, x])).values())
+        // 3b) Validate TV overlaps (same episode only)
+        const movies = [];
+        const tvCandidates = [];
+        for (const item of prelim) {
+            (item.media_type === 'tv' ? tvCandidates : movies).push(item);
+        }
+
+        const tvConfirmed = [];
+        for (const tv of tvCandidates) {
+            const ep = await confirmTvOverlap(tv.id, actor1Id, actor2Id);
+            if (!ep) continue;
+
+            const epDate = parseDateMaybe(ep.air_date);
+            tv.releaseDate = epDate || tv.releaseDate;
+            tv.year = yearOf(tv.releaseDate);
+            tv.a1AgeAt = ageAtDate(a1Details.birthday, tv.releaseDate);
+            tv.a2AgeAt = ageAtDate(a2Details.birthday, tv.releaseDate);
+            tv.overlap = ep;
+            tvConfirmed.push(tv);
+        }
+
+        // 4) merge, dedupe, sort by date desc
+        const merged = [...movies, ...tvConfirmed];
+        const uniq = Array.from(new Map(merged.map(x => [x.id + (x.media_type || ''), x])).values())
             .sort((a, b) => {
                 const ad = a.releaseDate ? a.releaseDate.getTime() : 0;
                 const bd = b.releaseDate ? b.releaseDate.getTime() : 0;
@@ -194,7 +294,9 @@ async function findCollaboration() {
 
     } catch (err) {
         console.error(err);
-        resultDiv.innerHTML = 'An error occurred. Please try again later.';
+        resultDiv.innerHTML = '<p class="empty">An error occurred. Please try again later.</p>';
+    } finally {
+        setLoading(false);
     }
 }
 
@@ -203,17 +305,17 @@ function displayResultDetailed(payload) {
     const { titles, a1, a2, firstYear, lastSince, count } = payload;
 
     if (!count) {
-        resultDiv.innerHTML = `<strong>No.</strong> ${a1.name} and ${a2.name} have not appeared together.`;
+        resultDiv.innerHTML = `<p class="emtpy"><strong>No.</strong> ${a1.name} and ${a2.name} have not appeared together.</p>`;
         return;
     }
 
     let html = `
-    <div style="margin-bottom:0.5rem">
+    <p class="result-summary">
       <strong>Yes.</strong> ${a1.name} and ${a2.name} have worked together ${count} time${count > 1 ? 's' : ''}.
       ${firstYear !== '—' ? ` First: ${firstYear}.` : ''} 
       ${lastSince !== '—' ? ` Most recent: ${lastSince}.` : ''}
-    </div>
-    <ul>
+    </p>
+    <ul class="credit-list">
   `;
 
     for (const t of titles) {
@@ -222,12 +324,33 @@ function displayResultDetailed(payload) {
         if (t.a1AgeAt != null) ageBits.push(`${a1.name}: ${t.a1AgeAt}`);
         if (t.a2AgeAt != null) ageBits.push(`${a2.name}: ${t.a2AgeAt}`);
 
-        const ageStr = ageBits.length ? ` — ages at release: ${ageBits.join(' · ')}` : '';
-        const roles = [t.a1Role, t.a2Role].some(Boolean)
-            ? ` — roles: ${t.a1Role || '—'} & ${t.a2Role || '—'}`
-            : '';
+        // if ((t.a1AgeAt != null && t.a1AgeAt <= 0) || (t.a2AgeAt != null && t.a2AgeAt <= 0)) continue;
 
-        html += `<li>${t.title} (${t.year})${roles}${ageStr}</li>`;
+        const mediaLabel =
+            t.media_type === 'movie' ? 'Movie'
+                : t.media_type === 'tv' ? 'TV'
+                    : (t.media_type || '');
+
+        const parts = [];
+        if (mediaLabel) parts.push(mediaLabel);
+        if ([t.a1Role, t.a2Role].some(Boolean)) parts.push(`roles: ${t.a1Role || '-'} & ${t.a2Role || '-'}`);
+        if (ageBits.length) parts.push(`ages at release: ${ageBits.join(' · ')}`);
+        const overlapInfo = (t.media_type === 'tv' && t.overlap)
+            ? ` · episode: S${t.overlap.season}E${t.overlap.episode}${t.overlap.name ? ` - ${t.overlap.name}` : ''}`
+            : '';
+        if (overlapInfo) parts.push(overlapInfo);
+
+        html += `
+            <li class="credit-item no-poster">
+                <div class="meta">
+                    <div class="title-row">
+                        <span class="title">${t.title}</span>
+                        <span class="badge">${t.year ?? '-'}</span>
+                    </div>
+                    <div class="subtext">${parts.join(' · ')}</div>
+                </div>
+            </li>
+        `;
     }
 
     html += '</ul>';
