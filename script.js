@@ -1,6 +1,7 @@
 // ----- CONFIG -----
 const API_BASE_URL = 'https://themoviedb-proxy.netlify.app/api';
-const INCLUDE_CREW = false; // set true if you want crew credits considered too
+const INCLUDE_CREW = false;
+const INCLUDE_ADULT = false;
 
 // ----- DOM -----
 const actor1Input = document.getElementById('actor1');
@@ -16,6 +17,7 @@ const now = () => new Date();
 function parseDateMaybe(s) {
     // TMDb dates are YYYY-MM-DD; sometimes missing or empty
     if (!s) return null;
+
     const d = new Date(s);
     return isNaN(d.getTime()) ? null : d;
 }
@@ -26,27 +28,40 @@ function yearOf(date) {
 
 function formatSince(date) {
     if (!date) return 'unknown';
+
     const diffMs = now() - date;
+
     if (diffMs < 0) return 'in the future';
+
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     const years = Math.floor(diffDays / 365.25);
     const months = Math.floor((diffDays % 365.25) / 30.44);
+
     if (years >= 1) return `${years}y ${months}m ago`;
+
     if (months >= 1) return `${months}m ago`;
+
     const weeks = Math.floor(diffDays / 7);
+
     if (weeks >= 1) return `${weeks}w ago`;
+
     return `${diffDays}d ago`;
 }
 
 function ageAtDate(birthdayStr, atDate) {
     if (!birthdayStr || !atDate) return null;
+
     const b = parseDateMaybe(birthdayStr);
+
     if (!b) return null;
+
     let age = atDate.getFullYear() - b.getFullYear();
     const hasHadBirthday =
         atDate.getMonth() > b.getMonth() ||
         (atDate.getMonth() === b.getMonth() && atDate.getDate() >= b.getDate());
+
     if (!hasHadBirthday) age -= 1;
+
     return age;
 }
 
@@ -67,8 +82,11 @@ function roleOf(credit) {
 const cache = new Map();
 async function fetchJSON(url) {
     if (cache.has(url)) return cache.get(url);
+
     const res = await fetch(url);
+
     if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+
     const data = await res.json();
     cache.set(url, data);
     return data;
@@ -86,7 +104,9 @@ async function getActorCredits(personId) {
     const data = await fetchJSON(url);
     // You were using cast only; keep that default
     const cast = data.cast || [];
+
     if (!INCLUDE_CREW) return cast;
+
     const crew = data.crew || [];
     return [...cast, ...crew];
 }
@@ -133,6 +153,7 @@ async function findCollaboration() {
         const shared = [];
         for (const c2 of a2Credits) {
             if (!map1.has(c2.id)) continue;
+
             const c1 = map1.get(c2.id);
             const releaseDate = releaseDateOf(c1) || releaseDateOf(c2);
             shared.push({
@@ -197,8 +218,10 @@ function displayResultDetailed(payload) {
 
     for (const t of titles) {
         const ageBits = [];
+
         if (t.a1AgeAt != null) ageBits.push(`${a1.name}: ${t.a1AgeAt}`);
         if (t.a2AgeAt != null) ageBits.push(`${a2.name}: ${t.a2AgeAt}`);
+
         const ageStr = ageBits.length ? ` — ages at release: ${ageBits.join(' · ')}` : '';
         const roles = [t.a1Role, t.a2Role].some(Boolean)
             ? ` — roles: ${t.a1Role || '—'} & ${t.a2Role || '—'}`
