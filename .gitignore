@@ -1,1 +1,3 @@
-config.js
+# Ignores initial/local config.js file that contains API_KEY
+# config.js # No longer needed, config is for the javascript now
+            # API_KEY stored through Netlify
