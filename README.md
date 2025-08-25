@@ -26,7 +26,7 @@ Front-end is static (GitHub Pages). API calls are proxied through a tiny Netlify
   - Function appends `api_key` (or Authorization bearer) from an environment variable and forwards to TMDb `v3`/`v4`.
   - CORS is restricted to your Pages domain (recommended).
 
-```
+```text
 Browser (GitHub Pages)  →  Netlify Function (/api/\*)  →  TMDb API
 ```
 
@@ -34,7 +34,7 @@ Browser (GitHub Pages)  →  Netlify Function (/api/\*)  →  TMDb API
 
 ## Repo layout (front-end)
 
-```
+```text
 / (root of GitHub Pages repo)
 index.html
 styles.css
@@ -49,7 +49,7 @@ ui.js           # status messages + results renderer
 
 Netlify proxy lives in a **separate repo** (or the same, your choice). Minimal structure:
 
-```
+```text
 tmdb-proxy/
 netlify.toml
 netlify/functions/
@@ -80,73 +80,73 @@ index.html     # (optional placeholder)
      from = "/api/*"
      to = "/.netlify/functions/tmdb/:splat"
      status = 200
-```
+   ```
 
-**`netlify/functions/tmdb.js`** (v3 api\_key style)
+   **`netlify/functions/tmdb.js`** (v3 api\_key style)
 
-```js
-const TMDB_BASE = "https://api.themoviedb.org/3";
-
-function corsHeaders() {
-  return {
-    // RECOMMENDED: set this to your GitHub Pages origin
-    // "Access-Control-Allow-Origin": "https://<username>.github.io"
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Cache-Control": "public, max-age=300",
-  };
-}
-
-exports.handler = async (event) => {
-  if (event.httpMethod === "OPTIONS") {
-    return { statusCode: 204, headers: corsHeaders() };
-  }
-  try {
-    const apiKey = process.env.TMDB_KEY;
-    if (!apiKey) {
-      return { statusCode: 500, headers: corsHeaders(), body: JSON.stringify({ error: "TMDB_KEY not set" }) };
-    }
-
-    // support both /.netlify/functions/tmdb/* and /api/*
-    let upstreamPath = event.path
-      .replace(/^\/\.netlify\/functions\/tmdb/, "")
-      .replace(/^\/api/, "");
-    if (!upstreamPath) upstreamPath = "/";
-
-    const url = new URL("https://api.themoviedb.org/3" + upstreamPath);
-
-    // copy query params (multi-value safe)
-    const mv = event.multiValueQueryStringParameters || {};
-    const qsp = event.queryStringParameters || {};
-    if (Object.keys(mv).length) {
-      for (const [k, arr] of Object.entries(mv)) for (const v of arr) url.searchParams.append(k, v);
-    } else {
-      for (const [k, v] of Object.entries(qsp)) if (v != null) url.searchParams.set(k, v);
-    }
-
-    url.searchParams.set("api_key", apiKey); // force our key
-
-    const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
-    const bodyText = await res.text();
-    return { statusCode: res.status, headers: { ...corsHeaders(), "Content-Type": res.headers.get("content-type") || "application/json" }, body: bodyText };
-  } catch (err) {
-    return { statusCode: 500, headers: corsHeaders(), body: JSON.stringify({ error: err.message }) };
-  }
-};
-```
+   ```js
+   const TMDB_BASE = "https://api.themoviedb.org/3";
+   
+   function corsHeaders() {
+     return {
+       // RECOMMENDED: set this to your GitHub Pages origin
+       // "Access-Control-Allow-Origin": "https://<username>.github.io"
+       "Access-Control-Allow-Origin": "*",
+       "Access-Control-Allow-Methods": "GET,OPTIONS",
+       "Access-Control-Allow-Headers": "Content-Type",
+       "Cache-Control": "public, max-age=300",
+     };
+   }
+   
+   exports.handler = async (event) => {
+     if (event.httpMethod === "OPTIONS") {
+       return { statusCode: 204, headers: corsHeaders() };
+     }
+     try {
+       const apiKey = process.env.TMDB_KEY;
+       if (!apiKey) {
+         return { statusCode: 500, headers: corsHeaders(), body: JSON.stringify({ error: "TMDB_KEY not set" }) };
+       }
+   
+       // support both /.netlify/functions/tmdb/* and /api/*
+       let upstreamPath = event.path
+         .replace(/^\/\.netlify\/functions\/tmdb/, "")
+         .replace(/^\/api/, "");
+       if (!upstreamPath) upstreamPath = "/";
+   
+       const url = new URL("https://api.themoviedb.org/3" + upstreamPath);
+   
+       // copy query params (multi-value safe)
+       const mv = event.multiValueQueryStringParameters || {};
+       const qsp = event.queryStringParameters || {};
+       if (Object.keys(mv).length) {
+         for (const [k, arr] of Object.entries(mv)) for (const v of arr) url.searchParams.append(k, v);
+       } else {
+         for (const [k, v] of Object.entries(qsp)) if (v != null) url.searchParams.set(k, v);
+       }
+   
+       url.searchParams.set("api_key", apiKey); // force our key
+   
+       const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+       const bodyText = await res.text();
+       return { statusCode: res.status, headers: { ...corsHeaders(), "Content-Type": res.headers.get("content-type") || "application/json" }, body: bodyText };
+     } catch (err) {
+       return { statusCode: 500, headers: corsHeaders(), body: JSON.stringify({ error: err.message }) };
+     }
+   };
+   ```
 
 2. In Netlify:
 
-   * **Add new site → Import from Git** → select the proxy repo.
-   * Build command: *(blank or `echo ok`)*; Publish directory: `public`.
-   * **Site settings → Environment variables**:
+   - **Add new site → Import from Git** → select the proxy repo.
+   - Build command: *(blank or `echo ok`)*; Publish directory: `public`.
+   - **Site settings → Environment variables**:
 
-     * `TMDB_KEY = <your v3 API key>`
+     - `TMDB_KEY = <your v3 API key>`
        *(Alternatively use `TMDB_BEARER` and add an `Authorization: Bearer …` header in the function.)*
-   * Deploy. Verify:
+   - Deploy. Verify:
 
-     ```
+     ```text
      https://<your-site>.netlify.app/api/search/person?query=Tom%20Hanks&include_adult=false
      ```
 
@@ -157,6 +157,7 @@ exports.handler = async (event) => {
    ```js
    export const API_BASE_URL = 'https://<your-netlify-site>.netlify.app/api';
    ```
+
 2. Push to your Pages repo and enable GitHub Pages (e.g., from `main` root or `docs/`).
 3. Open your Pages URL, search two actors, and you’re done.
 
@@ -164,8 +165,8 @@ exports.handler = async (event) => {
 
 ## How it determines “worked together”
 
-* **Movies**: intersection by TMDb credit ID in `combined_credits.cast` (and optionally crew if enabled).
-* **TV**: for each shared show:
+- **Movies**: intersection by TMDb credit ID in `combined_credits.cast` (and optionally crew if enabled).
+- **TV**: for each shared show:
 
   1. Get season numbers (skip “specials”/season 0 by default).
   2. Optionally pre-check season aggregate credits to see if both actors appear at all.
@@ -174,8 +175,8 @@ exports.handler = async (event) => {
 
 Performance techniques:
 
-* Shared in-flight requests, localStorage TTL cache, and concurrency caps (configurable in `TV_CHECK`).
-* AbortController to cancel ongoing scans if the user starts a new search or presses **Stop**.
+- Shared in-flight requests, localStorage TTL cache, and concurrency caps (configurable in `TV_CHECK`).
+- AbortController to cancel ongoing scans if the user starts a new search or presses **Stop**.
 
 ---
 
@@ -202,26 +203,26 @@ export const TV_CHECK = {
 
 ## UI & accessibility
 
-* Matches system theme (`prefers-color-scheme`), no toggle needed.
-* Keyboard friendly form controls; visible focus states.
-* **ARIA live region** announces search milestones (“resolving names… / gathering credits… / scrubbing TV episodes…”).
-* **Filters**: Movies / TV checkboxes; Search button disables if neither is selected.
-* Optional **Stop** button cancels in-flight scans.
+- Matches system theme (`prefers-color-scheme`), no toggle needed.
+- Keyboard friendly form controls; visible focus states.
+- **ARIA live region** announces search milestones (“resolving names… / gathering credits… / scrubbing TV episodes…”).
+- **Filters**: Movies / TV checkboxes; Search button disables if neither is selected.
+- Optional **Stop** button cancels in-flight scans.
 
 ---
 
 ## Nice extras
 
-* Type-ahead suggestions with `<datalist>`.
-* Recent searches chips.
-* Sort toggle (newest/oldest) or grouping by decade (must re-submit search to reverse order).
+- Type-ahead suggestions with `<datalist>`.
+- Recent searches chips.
+- Sort toggle (newest/oldest) or grouping by decade (must re-submit search to reverse order).
 
 ---
 
 ## Security notes
 
-* TMDb key is **not** shipped to the client. It lives only in Netlify environment variables and is appended server-side by the function.
-* Restrict the function’s CORS header to your Pages origin in production:
+- TMDb key is **not** shipped to the client. It lives only in Netlify environment variables and is appended server-side by the function.
+- Restrict the function’s CORS header to your Pages origin in production:
 
   ```js
   "Access-Control-Allow-Origin": "https://<username>.github.io"
@@ -231,8 +232,8 @@ export const TV_CHECK = {
 
 ## Local development
 
-* Static front-end can be opened with any local server (e.g., VS Code Live Server).
-* If you want to run the Netlify function locally, install `netlify-cli` in the proxy repo and run `netlify dev`.
+- Static front-end can be opened with any local server (e.g., VS Code Live Server).
+- If you want to run the Netlify function locally, install `netlify-cli` in the proxy repo and run `netlify dev`.
 
 ---
 
@@ -244,5 +245,5 @@ MIT — see [`LICENSE`](LICENSE).
 
 ## Credits
 
-* Data powered by [TMDb](https://www.themoviedb.org/).
-* Hosted on **GitHub Pages** (front-end) + **Netlify Functions** (API proxy).
+- Data powered by [TMDb](https://www.themoviedb.org/).
+- Hosted on **GitHub Pages** (front-end) + **Netlify Functions** (API proxy).
