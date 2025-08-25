@@ -1,4 +1,4 @@
-# acting-collabs
+# Actor Collab Finder
 
 Search two actors and see what they actually worked on **together** — across movies and (optionally) TV episodes — using [TMDb](https://www.themoviedb.org/) data.  
 Front-end is static (GitHub Pages). API calls are proxied through a tiny Netlify Function so your TMDb key stays private.
@@ -7,7 +7,7 @@ Front-end is static (GitHub Pages). API calls are proxied through a tiny Netlify
 
 ---
 
-## ✨ Features
+## Features
 
 - **Actor pair search** – Type two names, get verified shared credits.
 - **Movies / TV filters** – Choose Movies, TV, or both. TV scanning is heavier and can be toggled off.
@@ -18,7 +18,7 @@ Front-end is static (GitHub Pages). API calls are proxied through a tiny Netlify
 
 ---
 
-## 🧱 Architecture
+## Architecture
 
 - **GitHub Pages** hosts the static site (HTML/CSS/JS).
 - **Netlify Function** proxies requests to TMDb:
@@ -32,7 +32,7 @@ Browser (GitHub Pages)  →  Netlify Function (/api/\*)  →  TMDb API
 
 ---
 
-## 📁 Repo layout (front-end)
+## Repo layout (front-end)
 
 ```
 / (root of GitHub Pages repo)
@@ -56,17 +56,18 @@ netlify/functions/
 tmdb.js        # generic proxy; adds API key server-side
 public/
 index.html     # (optional placeholder)
-````
+```
 
 ---
 
-## 🚀 Quick start
+## Quick start
 
 ### 1) Create the Netlify proxy (one-time)
 
 1. Push the proxy repo to GitHub with:
 
    **`netlify.toml`**
+
    ```toml
    [functions]
      directory = "netlify/functions"
@@ -161,7 +162,7 @@ exports.handler = async (event) => {
 
 ---
 
-## 🧠 How it determines “worked together”
+## How it determines “worked together”
 
 * **Movies**: intersection by TMDb credit ID in `combined_credits.cast` (and optionally crew if enabled).
 * **TV**: for each shared show:
@@ -178,7 +179,7 @@ Performance techniques:
 
 ---
 
-## 🔧 Configuration
+## Configuration
 
 Edit `js/config.js`:
 
@@ -199,7 +200,7 @@ export const TV_CHECK = {
 
 ---
 
-## 🖥️ UI & accessibility
+## UI & accessibility
 
 * Matches system theme (`prefers-color-scheme`), no toggle needed.
 * Keyboard friendly form controls; visible focus states.
