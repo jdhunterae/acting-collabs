@@ -27,7 +27,7 @@ Front-end is static (GitHub Pages). API calls are proxied through a tiny Netlify
   - CORS is restricted to your Pages domain (recommended).
 
 ```text
-Browser (GitHub Pages)  →  Netlify Function (/api/\*)  →  TMDb API
+Browser (GitHub Pages)  →  Netlify Function (/api/*)  →  TMDb API
 ```
 
 ---
@@ -40,7 +40,7 @@ index.html
 styles.css
 /js
 app.js          # orchestrates a search and rendering
-config.js       # API\_BASE\_URL + feature flags
+config.js       # API_BASE_URL + feature flags
 fetcher.js      # caching, de-dup, retry, abort helpers
 tmdb.js         # TMDb calls + parsing helpers
 tvOverlap.js    # episode-level overlap checker (parallelized)
@@ -82,7 +82,7 @@ index.html     # (optional placeholder)
      status = 200
    ```
 
-   **`netlify/functions/tmdb.js`** (v3 api\_key style)
+   **`netlify/functions/tmdb.js`** (v3 api_key style)
 
    ```js
    const TMDB_BASE = "https://api.themoviedb.org/3";
@@ -110,8 +110,8 @@ index.html     # (optional placeholder)
    
        // support both /.netlify/functions/tmdb/* and /api/*
        let upstreamPath = event.path
-         .replace(/^\/\.netlify\/functions\/tmdb/, "")
-         .replace(/^\/api/, "");
+         .replace(^/.netlify/functions/tmdb/, "")
+         .replace(^/api/, "");
        if (!upstreamPath) upstreamPath = "/";
    
        const url = new URL("https://api.themoviedb.org/3" + upstreamPath);
